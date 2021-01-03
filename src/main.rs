@@ -8,6 +8,9 @@ use sdl2::video::GLProfile;
 
 use std::collections::HashMap;
 
+extern crate nalgebra;
+use nalgebra::Orthographic3;
+
 fn init_sdl() -> (sdl2::Sdl, sdl2::video::Window, sdl2::video::GLContext) {
     // Initialize SDL
     let sdl_context = match sdl2::init() {
@@ -48,25 +51,22 @@ fn init_sdl() -> (sdl2::Sdl, sdl2::video::Window, sdl2::video::GLContext) {
     // Load the OpenGL Functions
     gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as *const std::ffi::c_void);
 
-    (sdl_context, window, gl_context)
+    return (sdl_context, window, gl_context);
 }
 
 struct Character {
     id: GLuint,
-    size: (u32, u32),
-    bearing: (u32, u32),
-    advance: u32,
+    size: (i32, i32),
+    bearing: (i32, i32),
+    advance: i32,
 }
 
-fn main() {
-    // Initialize SDL and create a window
-    let (sdl_context, window, _gl_context) = init_sdl();
-
+fn init_freetype(font: &str) -> HashMap<u8, Character> {
     // Initialize Freetype
     let ft_library = freetype::Library::init().unwrap();
 
     // Load the font face we want to use
-    let face = match ft_library.new_face("./src/fonts/KottaOne.ttf", 0) {
+    let face = match ft_library.new_face(font, 0) {
         Ok(face) => face,
         Err(message) => panic!("Unable to open font: {}", message),
     };
@@ -77,16 +77,14 @@ fn main() {
     // Create the map that will store our character textures
     let mut char_map: HashMap<u8, Character> = HashMap::new();
 
-    // Generate a texture for every ascii character
-
     // Disable byte-alignment
     unsafe {
         gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
     }
 
+    // Generate a texture for every ascii character
     for c in 0..128 {
         // Attempt to load the glyph
-        // This can fail for some ascii characters that are not displayed
         match face.load_char(c as usize, freetype::face::LoadFlag::RENDER) {
             Ok(_) => (),
             Err(_) => continue,
@@ -97,7 +95,6 @@ fn main() {
         // Generate a texture and copy the glyphs bitmap into it
         let mut id = 0;
         unsafe {
-
             // Create a texture
             gl::GenTextures(1, &mut id);
             assert_ne!(id, 0);
@@ -113,7 +110,7 @@ fn main() {
                 0,
                 gl::RED,
                 gl::UNSIGNED_BYTE,
-                glyph.bitmap().buffer().as_ptr() as *const gl::types::GLvoid
+                glyph.bitmap().buffer().as_ptr() as *const gl::types::GLvoid,
             );
 
             // Set texture options
@@ -122,40 +119,97 @@ fn main() {
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
         }
-        
+
         // Add this character to our map
         char_map.insert(
             c as u8,
             Character {
-                id: 0,
-                size: (glyph.bitmap().width() as u32, glyph.bitmap().rows() as u32),
-                bearing: (0, 0),
-                advance: 0,
+                id,
+                size: (glyph.bitmap().width(), glyph.bitmap().rows()),
+                bearing: (glyph.bitmap_left(), glyph.bitmap_top()),
+                advance: glyph.advance().x as i32,
             },
         );
     }
 
-    face.load_char('G' as usize, freetype::face::LoadFlag::RENDER)
-        .unwrap();
+    return char_map;
+}
 
-    let glyph = face.glyph().bitmap();
+fn main() {
+    // Initialize SDL and create a window
+    let (sdl_context, window, _gl_context) = init_sdl();
 
-    println!(
-        "Width: {}, Rows: {}, Pitch: {}",
-        glyph.width(),
-        glyph.rows(),
-        glyph.pitch()
-    );
-    println!("{}", glyph.buffer().len());
+    let char_map = init_freetype("./src/fonts/KottaOne.ttf");
 
-    for h in 0..glyph.rows() {
-        for w in 0..glyph.width() {
-            if glyph.buffer()[(h * glyph.width() + w) as usize] != 0 {
-                print!("#");
-            } else {
-                print!(".");
-            }
+    
+
+    // Set the projection matrix
+    let projection_id = unsafe {
+        gl::GetUniformLocation(
+            shader_program.id,
+            CString::new("projection").unwrap().as_ptr()
+        )
+    };
+
+    let aspect = 1.0;
+    let projection = Orthographic3::new(-aspect, aspect, -1.0, 1.0, -1.0, 1.0);
+
+    // Write the projection to the gpu
+    unsafe {
+        gl::UniformMatrix4fv(
+            projection_id,
+            1,
+            gl::FALSE,
+            projection.to_homogeneous().as_slice().as_ptr()
+        );
+    };
+    
+    // Last Bit
+    unsafe {
+        gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+        gl::Enable(gl::BLEND);
+
+        gl::Enable(gl::CULL_FACE);
+
+        gl::ClearColor(0.3, 0.3, 0.5, 1.0);
+        gl::Clear(gl::COLOR_BUFFER_BIT);
+    };
+
+    // Enter the main event loop
+    let mut event_pump = sdl_context.event_pump().unwrap();
+
+    'main_loop: loop {
+        // Clear the event queue
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } => break 'main_loop,
+                Event::Window { win_event, .. } => match win_event {
+                    WindowEvent::Resized(x, y) => unsafe {
+                        gl::Viewport(0, 0, x, y);
+
+                        // Compute the projection
+                        let aspect = x as f32 / y as f32;
+                        let projection = Orthographic3::new(-aspect, aspect, -1.0, 1.0, -1.0, 1.0);
+
+                        // Write the projection to the gpu
+                        shader_program.set_used();
+                        gl::UniformMatrix4fv(
+                            projection_id,
+                            1,
+                            gl::FALSE,
+                            projection.to_homogeneous().as_slice().as_ptr(),
+                        );
+                    },
+                    _ => {}
+                },
+                _ => {}
+            };
         }
-        println!();
+
+        // Swap the buffers
+        window.gl_swap_window();
+
+        let sleep_time = std::time::Duration::from_millis(5);
+        std::thread::sleep(sleep_time);
     }
 }
