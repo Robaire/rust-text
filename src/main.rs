@@ -265,6 +265,55 @@ fn main() {
             };
         }
 
+        // Render some text to the screen
+        let text = "Hello World!";
+        let mut x = 0.0;
+        let y = 0.0;
+        let scale = 1.0;
+
+
+        shader_program.set_used();
+
+        unsafe {
+            gl::ActiveTexture(gl::TEXTURE0); // What does this do?
+        }
+
+        gl_util::bind_array(vao);
+
+        for c in text.chars() {
+
+            let ch: &Character = match char_map.get(&(c as u8)) {
+                Some(character) => character,
+                None => continue,
+            };
+
+            let xpos = x + ch.bearing.0 as f32 * scale;
+            let ypos = y - (ch.size.1 - ch.bearing.1) as f32 * scale;
+
+            let w = ch.size.0 as f32 * scale;
+            let h = ch.size.1 as f32 * scale;
+
+            let vertices = vec![
+                xpos, ypos + h, 0.0, 0.0,
+                xpos, ypos, 0.0, 1.0,
+                xpos + w, ypos, 1.0, 1.0,
+                xpos, ypos + h, 0.0, 0.0,
+                xpos + w, ypos, 1.0, 1.0,
+                xpos + w, ypos + h, 1.0, 0.0
+            ];
+
+            gl_util::bind_texture(ch.id);
+            gl_util::set_buffer_data(vbo, &vertices);
+
+            gl_util::draw_triangles(6);
+
+            x += (ch.advance >> 6) as f32 * scale;
+        }
+
+        gl_util::bind_array(0);
+        gl_util::bind_texture(0);
+
+
         // Swap the buffers
         window.gl_swap_window();
 
