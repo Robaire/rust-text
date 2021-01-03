@@ -7,7 +7,7 @@ use std::fs;
 /// Represents a compiled shader object
 pub struct Shader {
     id: GLuint,
-    kind: GLenum
+    kind: GLenum,
 }
 
 impl Drop for Shader {
@@ -28,7 +28,7 @@ impl Shader {
         // Read the source file in as a string
         let source = match fs::read_to_string(path) {
             Ok(string) => string,
-            Err(message) => panic!(format!("Shader creation failed: {}", message))
+            Err(message) => panic!(format!("Shader creation failed: {}", message)),
         };
 
         // Create a shader object on the GPU
@@ -40,7 +40,7 @@ impl Shader {
                 id,
                 1,
                 &CString::new(source).unwrap().as_ptr(),
-                std::ptr::null()
+                std::ptr::null(),
             );
             gl::CompileShader(id);
         };
@@ -76,7 +76,7 @@ impl Shader {
 /// Represents a complete shader program
 pub struct Program {
     pub id: GLuint,
-    shaders: Vec<GLuint>
+    shaders: Vec<GLuint>,
 }
 
 impl Program {
@@ -85,7 +85,7 @@ impl Program {
         let id = unsafe { gl::CreateProgram() };
         Program {
             id,
-            shaders: vec![]
+            shaders: vec![],
         }
     }
 
@@ -135,7 +135,7 @@ impl Program {
                     self.id,
                     len,
                     std::ptr::null_mut(),
-                    error.as_ptr() as *mut GLchar
+                    error.as_ptr() as *mut GLchar,
                 );
             };
 
