@@ -50,31 +50,31 @@ fn init_sdl() -> (sdl2::Sdl, sdl2::video::Window, sdl2::video::GLContext) {
 
 fn main() {
     // Initialize Freetype
-    let ft_library = freetype::Library::init().unwrap();
 
-    let face = ft_library.new_face("./src/fonts/Pixeletter.ttf", 0).unwrap();
+    let ft_library = freetype::Library::init().unwrap();
+    // let face = ft_library.new_face("./src/fonts/Pixeletter.ttf", 0).unwrap();
+    let face = ft_library.new_face("./src/fonts/KottaOne.ttf", 0).unwrap();
 
     face.set_char_size(5000, 0, 50, 0).unwrap();
 
-    face.load_char('S' as usize, freetype::face::LoadFlag::RENDER).unwrap();
+    face.load_char('g' as usize, freetype::face::LoadFlag::RENDER).unwrap();
 
     let glyph = face.glyph().bitmap();
 
-    println!("({}, {})", glyph.width(), glyph.rows());
+
+    println!("Width: {}, Rows: {}, Pitch: {}", glyph.width(), glyph.rows(), glyph.pitch());
     println!("{}", glyph.buffer().len());
 
     for h in 0..glyph.rows() {
         for w in 0..glyph.width() {
 
-            if glyph.buffer()[(h * 31 + w) as usize] != 0 {
+            if glyph.buffer()[(h * glyph.width() + w) as usize] != 0 {
                 print!("#");
             } else {
-                print!(" ");
+                print!(".");
             }
             // print!("{}", glyph.buffer()[((w-1) * 31 + h-1) as usize]);
-
         }
-
         println!();
     }
 
