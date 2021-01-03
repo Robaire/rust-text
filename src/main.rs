@@ -1,21 +1,20 @@
 extern crate gl;
 extern crate sdl2;
-use sdl2::video::GLProfile;
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Scancode;
+use sdl2::video::GLProfile;
 
 fn init_sdl() -> (sdl2::Sdl, sdl2::video::Window, sdl2::video::GLContext) {
-
     // Initialize SDL
     let sdl_context = match sdl2::init() {
         Ok(context) => context,
-        Err(message) => panic!(format!("SDL Init Failed: {}", message))
+        Err(message) => panic!(format!("SDL Init Failed: {}", message)),
     };
 
     // Ask SDL to initialize the vide system
     let video_subsystem = match sdl_context.video() {
         Ok(video_subsystem) => video_subsystem,
-        Err(message) => panic!(format!("Failed to create video subsystem: {}", message))
+        Err(message) => panic!(format!("Failed to create video subsystem: {}", message)),
     };
 
     // Set the attributes of the OpenGL Context
@@ -30,15 +29,16 @@ fn init_sdl() -> (sdl2::Sdl, sdl2::video::Window, sdl2::video::GLContext) {
         .position_centered()
         .resizable()
         .opengl()
-        .build() {
-            Ok(window) => window,
-            Err(message) => panic!(format!("Failed to create window: {}", message))
-        };
+        .build()
+    {
+        Ok(window) => window,
+        Err(message) => panic!(format!("Failed to create window: {}", message)),
+    };
 
     // Create the OpenGL Context
-    let gl_context  = match window.gl_create_context() {
+    let gl_context = match window.gl_create_context() {
         Ok(context) => context,
-        Err(message) => panic!(format!("Failed to create OpenGL Context: {}", message))
+        Err(message) => panic!(format!("Failed to create OpenGL Context: {}", message)),
     };
 
     // Load the OpenGL Functions
@@ -46,7 +46,6 @@ fn init_sdl() -> (sdl2::Sdl, sdl2::video::Window, sdl2::video::GLContext) {
 
     (sdl_context, window, gl_context)
 }
-
 
 fn main() {
     // Initialize Freetype
@@ -57,17 +56,21 @@ fn main() {
 
     face.set_char_size(5000, 0, 50, 0).unwrap();
 
-    face.load_char('g' as usize, freetype::face::LoadFlag::RENDER).unwrap();
+    face.load_char('g' as usize, freetype::face::LoadFlag::RENDER)
+        .unwrap();
 
     let glyph = face.glyph().bitmap();
 
-
-    println!("Width: {}, Rows: {}, Pitch: {}", glyph.width(), glyph.rows(), glyph.pitch());
+    println!(
+        "Width: {}, Rows: {}, Pitch: {}",
+        glyph.width(),
+        glyph.rows(),
+        glyph.pitch()
+    );
     println!("{}", glyph.buffer().len());
 
     for h in 0..glyph.rows() {
         for w in 0..glyph.width() {
-
             if glyph.buffer()[(h * glyph.width() + w) as usize] != 0 {
                 print!("#");
             } else {
