@@ -24,7 +24,7 @@ pub fn set_buffer_data(id: u32, data: &Vec<f32>) {
             gl::ARRAY_BUFFER,
             (data.len() * std::mem::size_of::<f32>()) as gl::types::GLsizeiptr,
             data.as_ptr() as *const gl::types::GLvoid,
-            gl::STATIC_DRAW
+            gl::DYNAMIC_DRAW,
         );
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
     };
