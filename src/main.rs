@@ -3,13 +3,16 @@ use gl::types::{GLchar, GLenum, GLint, GLuint};
 
 extern crate sdl2;
 use sdl2::event::{Event, WindowEvent};
-use sdl2::keyboard::Scancode;
 use sdl2::video::GLProfile;
-
-use std::collections::HashMap;
 
 extern crate nalgebra;
 use nalgebra::Orthographic3;
+
+pub mod shader;
+use shader::{Program, Shader};
+
+use std::collections::HashMap;
+use std::ffi::CString;
 
 fn init_sdl() -> (sdl2::Sdl, sdl2::video::Window, sdl2::video::GLContext) {
     // Initialize SDL
@@ -135,19 +138,51 @@ fn init_freetype(font: &str) -> HashMap<u8, Character> {
     return char_map;
 }
 
+fn create_shader_program() -> Program {
+    // Load shaders
+    let vertex_shader = match Shader::new_from_file("./src/shaders/vertex.glsl", gl::VERTEX_SHADER)
+    {
+        Ok(shader) => shader,
+        Err(message) => panic!(format!("Failed to create vertex shader: {}", message)),
+    };
+
+    let fragment_shader =
+        match Shader::new_from_file("./src/shaders/fragment.glsl", gl::FRAGMENT_SHADER) {
+            Ok(shader) => shader,
+            Err(message) => panic!(format!("Failed to create fragment shader: {}", message)),
+        };
+
+    // Create shader program
+    let shader_program = match Program::new()
+        .attach_shader(&vertex_shader)
+        .attach_shader(&fragment_shader)
+        .link()
+    {
+        Ok(program) => program,
+        Err(message) => panic!(format!("Failed to create shader program: {}", message)),
+    };
+
+    // Use shader program
+    shader_program.set_used();
+
+    return shader_program;
+}
+
 fn main() {
     // Initialize SDL and create a window
     let (sdl_context, window, _gl_context) = init_sdl();
 
+    // Generate font textures with Freetype
     let char_map = init_freetype("./src/fonts/KottaOne.ttf");
 
-    
+    // Create shader programs to render the font
+    let shader_program = create_shader_program();
 
     // Set the projection matrix
     let projection_id = unsafe {
         gl::GetUniformLocation(
             shader_program.id,
-            CString::new("projection").unwrap().as_ptr()
+            CString::new("projection").unwrap().as_ptr(),
         )
     };
 
@@ -160,11 +195,11 @@ fn main() {
             projection_id,
             1,
             gl::FALSE,
-            projection.to_homogeneous().as_slice().as_ptr()
+            projection.to_homogeneous().as_slice().as_ptr(),
         );
     };
-    
-    // Last Bit
+
+    // Configure some OpenGL functionality
     unsafe {
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
         gl::Enable(gl::BLEND);
