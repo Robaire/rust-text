@@ -14,5 +14,6 @@ void main() {
     vec4 sampled = vec4(1.0, 1.0, 1.0, texture(texture_sampler, texture_coordinate).r);
 
     // Multiple our text color by the alpha
-    Color = vec4(1.0, 0.0, 1.0, 1.0) * sampled;
+    // Color = vec4(1.0, 0.0, 1.0, 1.0) * sampled;
+    Color = vec4(1.0, 0.0, 1.0, 1.0);
 }
