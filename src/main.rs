@@ -102,12 +102,15 @@ fn main() {
 
             // Generate a texture and copy the glyphs bitmap into it
             let id = gl_util::generate_texture();
+
+            gl_util::bind_texture(id);
+
             unsafe {
                 // Upload bitmap data to the texture
                 gl::TexImage2D(
                     gl::TEXTURE_2D,
                     0,
-                    gl::RED as i32,
+                    gl::R8 as i32,
                     glyph.bitmap().width(),
                     glyph.bitmap().rows(),
                     0,
