@@ -107,7 +107,6 @@ fn main() {
 
         face.set_char_size(0, 48 * 64, dpi.0 as u32, dpi.1 as u32)
             .unwrap();
-        // face.set_pixel_sizes(0, 64 * 2).unwrap();
 
         // Create the map that will store our character textures
         let mut char_map: HashMap<u8, Character> = HashMap::new();
@@ -242,10 +241,7 @@ fn main() {
     let update_projection = || {
         let aspect = window.size().0 as f32 / window.size().1 as f32;
         // let projection = Orthographic3::new(-aspect, aspect, -1.0, 1.0, -1.0, 1.0);
-        // let projection = Orthographic3::new(-1.0, 1.0, -aspect, aspect, -1.0, 1.0);
         let projection = Orthographic3::new(-1.0, 1.0, -1.0 / aspect, 1.0 / aspect, -1.0, 1.0);
-        // let projection = Orthographic3::new(-aspect, aspect, - 1.0 / aspect, 1.0 / aspect, -1.0, 1.0);
-        // let projection = Orthographic3::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 
         // Write the projection to the GPU
         unsafe {
@@ -280,7 +276,11 @@ fn main() {
                 width += ch.bearing.0
             };
         }
+
+        width
     };
+
+    println!("Text Width: {}", get_text_width());
 
     let draw_text = || {};
 
@@ -325,10 +325,9 @@ fn main() {
         }
 
         // Render some text to the screen
-        let text = "Hello World!";
-        let mut x = 0.0;
-        let y = 0.0;
         let scale = 0.001;
+        let mut x = -(get_text_width() as f32 / 2.0) * scale;
+        let y = 0.0;
 
         shader_program.set_used();
 
