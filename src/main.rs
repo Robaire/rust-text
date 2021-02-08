@@ -105,7 +105,7 @@ fn main() {
             Err(_) => (200.0, 200.0, 0.0),
         };
 
-        face.set_char_size(0, 48 * 64, dpi.0 as u32, dpi.1 as u32)
+        face.set_char_size(0, 32 * 64, dpi.0 as u32, dpi.1 as u32)
             .unwrap();
 
         // Create the map that will store our character textures
