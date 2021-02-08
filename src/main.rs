@@ -270,11 +270,7 @@ fn main() {
 
             // Add the width of each character plus its horizontal bearing
             width += ch.size.0;
-
-            // Don't add the bearing of the first character in the string
-            if i != 0 {
-                width += ch.bearing.0
-            };
+            width += ch.bearing.0;
         }
 
         width
