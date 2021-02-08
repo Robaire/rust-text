@@ -2,8 +2,11 @@ extern crate gl;
 use gl::types::{GLchar, GLenum, GLint, GLuint};
 
 extern crate sdl2;
-use sdl2::event::{Event, WindowEvent};
 use sdl2::video::GLProfile;
+use sdl2::{
+    event::{Event, WindowEvent},
+    video,
+};
 
 extern crate nalgebra;
 use nalgebra::Orthographic3;
@@ -17,15 +20,20 @@ use std::ffi::CString;
 use std::{collections::HashMap, ptr::null};
 
 fn main() {
+    // The initial size of the window, as a fraction of the display width,
+    // maintaining the aspect ratio of the display
+    // TODO: Fix issues with virtual resolution (aka display scaling)
+    let initial_window_size = 0.5;
+
     // Initialize SDL and create a window
-    let (sdl_context, window, _gl_context) = {
+    let (sdl_context, window, _gl_context, video_subsystem) = {
         // Initialize SDL
         let sdl_context = match sdl2::init() {
             Ok(context) => context,
             Err(message) => panic!("SDL Init Failed: {}", message),
         };
 
-        // Ask SDL to initialize the vide system
+        // Ask SDL to initialize the video system
         let video_subsystem = match sdl_context.video() {
             Ok(video_subsystem) => video_subsystem,
             Err(message) => panic!("Failed to create video subsystem: {}", message),
@@ -37,9 +45,21 @@ fn main() {
         gl_attributes.set_context_flags().debug().set();
         gl_attributes.set_context_version(3, 3);
 
+        // Determine the size of the window to open
+        let (width, height) = match video_subsystem.desktop_display_mode(0) {
+            Ok(display_mode) => {
+                // Compute the width and height of the window
+                let width = display_mode.w as f32 * initial_window_size;
+                let height = width / (display_mode.w as f32 / display_mode.h as f32);
+
+                (width as u32, height as u32)
+            }
+            Err(message) => panic!("Failed to get desktop display mode: {}", message),
+        };
+
         // Create the window
         let window = match video_subsystem
-            .window("Rust Font Rendering", 600, 600)
+            .window("Rust Font Rendering", width, height)
             .position_centered()
             .resizable()
             .opengl()
@@ -58,7 +78,7 @@ fn main() {
         // Load the OpenGL Functions
         gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as *const std::ffi::c_void);
 
-        (sdl_context, window, gl_context)
+        (sdl_context, window, gl_context, video_subsystem)
     };
 
     // Generate font textures with Freetype
@@ -79,8 +99,15 @@ fn main() {
             Err(message) => panic!("Unable to open font: {}", message),
         };
 
-        // Set the font height in pixels
-        face.set_pixel_sizes(0, 50).unwrap();
+        // Set the character size using the display DPI
+        let dpi = match video_subsystem.display_dpi(0) {
+            Ok(dpi) => dpi,
+            Err(_) => (200.0, 200.0, 0.0),
+        };
+
+        face.set_char_size(0, 48 * 64, dpi.0 as u32, dpi.1 as u32)
+            .unwrap();
+        // face.set_pixel_sizes(0, 64 * 2).unwrap();
 
         // Create the map that will store our character textures
         let mut char_map: HashMap<u8, Character> = HashMap::new();
@@ -97,12 +124,10 @@ fn main() {
                 Ok(_) => (),
                 Err(_) => continue,
             };
-
             let glyph = face.glyph();
 
             // Generate a texture and copy the glyphs bitmap into it
             let id = gl_util::generate_texture();
-
             gl_util::bind_texture(id);
 
             unsafe {
@@ -121,9 +146,9 @@ fn main() {
 
                 // Set texture options
                 gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
-                gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+                gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
                 gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-                gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+                gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
             }
 
             // Add this character to our map
@@ -213,18 +238,54 @@ fn main() {
         )
     };
 
-    let aspect = 1.0;
-    let projection = Orthographic3::new(-aspect, aspect, -1.0, 1.0, -1.0, 1.0);
+    // A function to calculate a projection matrix based on the window dimensions and update the GPU with it
+    let update_projection = || {
+        let aspect = window.size().0 as f32 / window.size().1 as f32;
+        // let projection = Orthographic3::new(-aspect, aspect, -1.0, 1.0, -1.0, 1.0);
+        // let projection = Orthographic3::new(-1.0, 1.0, -aspect, aspect, -1.0, 1.0);
+        let projection = Orthographic3::new(-1.0, 1.0, -1.0 / aspect, 1.0 / aspect, -1.0, 1.0);
+        // let projection = Orthographic3::new(-aspect, aspect, - 1.0 / aspect, 1.0 / aspect, -1.0, 1.0);
+        // let projection = Orthographic3::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 
-    // Write the projection to the gpu
-    unsafe {
-        gl::UniformMatrix4fv(
-            projection_id,
-            1,
-            gl::FALSE,
-            projection.to_homogeneous().as_slice().as_ptr(),
-        );
+        // Write the projection to the GPU
+        unsafe {
+            gl::UniformMatrix4fv(
+                projection_id,
+                1,
+                gl::FALSE,
+                projection.to_homogeneous().as_slice().as_ptr(),
+            );
+        };
     };
+
+    // Main text to draw
+    let text = "Hello World!";
+
+    let get_text_width = || {
+        let mut width = 0;
+
+        // Compute the total width of the string so we can center it
+        for (i, c) in text.chars().enumerate() {
+            // Get the character from the character map
+            let ch: &Character = match char_map.get(&(c as u8)) {
+                Some(character) => character,
+                None => continue,
+            };
+
+            // Add the width of each character plus its horizontal bearing
+            width += ch.size.0;
+
+            // Don't add the bearing of the first character in the string
+            if i != 0 {
+                width += ch.bearing.0
+            };
+        }
+    };
+
+    let draw_text = || {};
+
+    // Go ahead and update the projection
+    update_projection();
 
     // Configure some OpenGL functionality
     unsafe {
@@ -240,7 +301,6 @@ fn main() {
     // Enter the main event loop
     let mut event_pump = sdl_context.event_pump().unwrap();
     'main_loop: loop {
-
         // Clear the event queue
         for event in event_pump.poll_iter() {
             match event {
@@ -250,17 +310,9 @@ fn main() {
                         gl::Viewport(0, 0, x, y);
 
                         // Compute the projection
-                        let aspect = x as f32 / y as f32;
-                        let projection = Orthographic3::new(-aspect, aspect, -1.0, 1.0, -1.0, 1.0);
+                        update_projection();
 
-                        // Write the projection to the gpu
-                        shader_program.set_used();
-                        gl::UniformMatrix4fv(
-                            projection_id,
-                            1,
-                            gl::FALSE,
-                            projection.to_homogeneous().as_slice().as_ptr(),
-                        );
+                        // Compute new text size
                     },
                     _ => {}
                 },
@@ -276,7 +328,7 @@ fn main() {
         let text = "Hello World!";
         let mut x = 0.0;
         let y = 0.0;
-        let scale = 0.01;
+        let scale = 0.001;
 
         shader_program.set_used();
 
@@ -287,7 +339,6 @@ fn main() {
         gl_util::bind_array(vao);
 
         for c in text.chars() {
-
             let ch: &Character = match char_map.get(&(c as u8)) {
                 Some(character) => character,
                 None => continue,
@@ -300,12 +351,30 @@ fn main() {
             let h = ch.size.1 as f32 * scale;
 
             let vertices = vec![
-                xpos, ypos + h, 0.0, 0.0,
-                xpos, ypos, 0.0, 1.0,
-                xpos + w, ypos, 1.0, 1.0,
-                xpos, ypos + h, 0.0, 0.0,
-                xpos + w, ypos, 1.0, 1.0,
-                xpos + w, ypos + h, 1.0, 0.0
+                xpos,
+                ypos + h,
+                0.0,
+                0.0,
+                xpos,
+                ypos,
+                0.0,
+                1.0,
+                xpos + w,
+                ypos,
+                1.0,
+                1.0,
+                xpos,
+                ypos + h,
+                0.0,
+                0.0,
+                xpos + w,
+                ypos,
+                1.0,
+                1.0,
+                xpos + w,
+                ypos + h,
+                1.0,
+                0.0,
             ];
 
             gl_util::bind_texture(ch.id);
@@ -317,7 +386,6 @@ fn main() {
 
         gl_util::bind_array(0);
         gl_util::bind_texture(0);
-
 
         // Swap the buffers
         window.gl_swap_window();
