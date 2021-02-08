@@ -257,7 +257,7 @@ fn main() {
     // Main text to draw
     let text = "Hello World!";
 
-    let get_text_width = || {
+    let get_text_width = |text: &str| {
         let mut width = 0;
 
         // Compute the total width of the string so we can center it
@@ -280,60 +280,14 @@ fn main() {
         width
     };
 
-    println!("Text Width: {}", get_text_width());
-
-    let draw_text = || {};
-
-    // Go ahead and update the projection
-    update_projection();
-
-    // Configure some OpenGL functionality
-    unsafe {
-        gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
-        gl::Enable(gl::BLEND);
-
-        // gl::Enable(gl::CULL_FACE);
-
-        gl::ClearColor(0.3, 0.3, 0.5, 1.0);
-        gl::Clear(gl::COLOR_BUFFER_BIT);
-    };
-
-    // Enter the main event loop
-    let mut event_pump = sdl_context.event_pump().unwrap();
-    'main_loop: loop {
-        // Clear the event queue
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. } => break 'main_loop,
-                Event::Window { win_event, .. } => match win_event {
-                    WindowEvent::Resized(x, y) => unsafe {
-                        gl::Viewport(0, 0, x, y);
-
-                        // Compute the projection
-                        update_projection();
-
-                        // Compute new text size
-                    },
-                    _ => {}
-                },
-                _ => {}
-            };
-        }
-
-        unsafe {
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
-
+    // Renders a line of text to the screen at a specified position
+    let render_text = |text: &str, ypos: f32| {
         // Render some text to the screen
         let scale = 0.001;
-        let mut x = -(get_text_width() as f32 / 2.0) * scale;
-        let y = 0.0;
+        let mut x = -(get_text_width(text) as f32 / 2.0) * scale;
+        let y = ypos;
 
         shader_program.set_used();
-
-        unsafe {
-            // gl::ActiveTexture(gl::TEXTURE0); // What does this do?
-        }
 
         gl_util::bind_array(vao);
 
@@ -382,6 +336,62 @@ fn main() {
 
             x += (ch.advance >> 6) as f32 * scale;
         }
+    };
+
+    // Go ahead and update the projection
+    update_projection();
+
+    // Configure some OpenGL functionality
+    unsafe {
+        gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+        gl::Enable(gl::BLEND);
+
+        // gl::Enable(gl::CULL_FACE);
+
+        gl::ClearColor(0.3, 0.3, 0.5, 1.0);
+        gl::Clear(gl::COLOR_BUFFER_BIT);
+    };
+
+    let mut cursor_pos = (0, 0);
+
+    // Enter the main event loop
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    'main_loop: loop {
+        // Clear the event queue
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } => break 'main_loop,
+                Event::Window { win_event, .. } => match win_event {
+                    WindowEvent::Resized(x, y) => unsafe {
+                        gl::Viewport(0, 0, x, y);
+
+                        // Compute the projection
+                        update_projection();
+
+                        // Compute new text size
+                    },
+                    _ => {}
+                },
+                Event::MouseMotion { x, y, .. } => {
+                    cursor_pos = (x, y);
+                }
+                _ => {}
+            };
+        }
+
+        unsafe {
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+        }
+
+        render_text("Hello World!", 0.25);
+        render_text(
+            &format!("Cursor: {}, {}", cursor_pos.0, cursor_pos.1),
+            -0.25,
+        );
+        render_text(
+            &format!("Window Size: {}, {}", window.size().0, window.size().1),
+            0.0,
+        );
 
         gl_util::bind_array(0);
         gl_util::bind_texture(0);
