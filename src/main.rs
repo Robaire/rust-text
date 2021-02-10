@@ -3,10 +3,7 @@ use gl::types::{GLchar, GLenum, GLint, GLuint};
 
 extern crate sdl2;
 use sdl2::video::GLProfile;
-use sdl2::{
-    event::{Event, WindowEvent},
-    video,
-};
+use sdl2::event::{Event, WindowEvent};
 
 extern crate nalgebra;
 use nalgebra::Orthographic3;
@@ -102,7 +99,7 @@ fn main() {
         // Set the character size using the display DPI
         let dpi = match video_subsystem.display_dpi(0) {
             Ok(dpi) => dpi,
-            Err(_) => (200.0, 200.0, 0.0),
+            Err(_) => (200.0, 200.0, 200.0),
         };
 
         face.set_char_size(0, 32 * 64, dpi.0 as u32, dpi.1 as u32)
