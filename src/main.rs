@@ -7,6 +7,7 @@ use sdl2::event::{Event, WindowEvent};
 
 extern crate nalgebra;
 use nalgebra::Orthographic3;
+use nalgebra::Matrix4;
 
 pub mod shader;
 use shader::{Program, Shader};
@@ -236,9 +237,11 @@ fn main() {
 
     // A function to calculate a projection matrix based on the window dimensions and update the GPU with it
     let update_projection = || {
-        let aspect = window.size().0 as f32 / window.size().1 as f32;
-        // let projection = Orthographic3::new(-aspect, aspect, -1.0, 1.0, -1.0, 1.0);
-        let projection = Orthographic3::new(-1.0, 1.0, -1.0 / aspect, 1.0 / aspect, -1.0, 1.0);
+
+        let w = window.size().0 as f32 / 2.0;
+        let h = window.size().1 as f32 / 2.0;
+
+        let projection = Orthographic3::new(-w, w, - h, h, -1.0, 1.0);
 
         // Write the projection to the GPU
         unsafe {
@@ -276,8 +279,7 @@ fn main() {
     // Renders a line of text to the screen at a specified position
     let render_text = |text: &str, ypos: f32| {
         // Render some text to the screen
-        let scale = 0.001;
-        let mut x = -(get_text_width(text) as f32 / 2.0) * scale;
+        let mut x = -(get_text_width(text) as f32 / 2.0);
         let y = ypos;
 
         shader_program.set_used();
@@ -290,11 +292,26 @@ fn main() {
                 None => continue,
             };
 
-            let xpos = x + (ch.bearing.0 as f32 * scale);
-            let ypos = y - ((ch.size.1 - ch.bearing.1) as f32 * scale);
 
-            let w = ch.size.0 as f32 * scale;
-            let h = ch.size.1 as f32 * scale;
+            // Character units are expressed in 26.6 pixel format (1/64th of a pixel)
+            /* 
+            For pixel perfect font rendering we need to apply the correct transformation to the view space.
+            This involves determining the conversion of 'font pixels' to 'double unit cube' coordinates.
+            Effectively this is a translation and scaling in the X and Y axes (aka an orthographic projection)
+            This is different than the orthographic projection that would be normally used for transforming 'world coordinates'
+            to 'view space' coordinates. 
+
+            Orthographic(left, right, bottom, top, near, far)
+            Orthographic(0, Window Width (pixels), 0, Window Height (pixels), -1.0, 1.0)
+            */
+
+            let xpos = x + ch.bearing.0 as f32;
+            let ypos = y - (ch.size.1 - ch.bearing.1) as f32;
+
+            let w = ch.size.0 as f32;
+            let h = ch.size.1 as f32;
+
+            println!("Character: {}, Size: ({}, {})", c, w, h);
 
             let vertices = vec![
                 xpos,
@@ -327,7 +344,7 @@ fn main() {
             gl_util::set_buffer_data(vbo, &vertices);
             gl_util::draw_triangles(6);
 
-            x += (ch.advance >> 6) as f32 * scale;
+            x += (ch.advance >> 6) as f32;
         }
     };
 
