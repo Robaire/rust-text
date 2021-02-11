@@ -2,12 +2,12 @@ extern crate gl;
 use gl::types::{GLchar, GLenum, GLint, GLuint};
 
 extern crate sdl2;
-use sdl2::video::GLProfile;
 use sdl2::event::{Event, WindowEvent};
+use sdl2::video::GLProfile;
 
 extern crate nalgebra;
-use nalgebra::Orthographic3;
 use nalgebra::Matrix4;
+use nalgebra::Orthographic3;
 
 pub mod shader;
 use shader::{Program, Shader};
@@ -237,11 +237,10 @@ fn main() {
 
     // A function to calculate a projection matrix based on the window dimensions and update the GPU with it
     let update_projection = || {
-
         let w = window.size().0 as f32 / 2.0;
         let h = window.size().1 as f32 / 2.0;
 
-        let projection = Orthographic3::new(-w, w, - h, h, -1.0, 1.0);
+        let projection = Orthographic3::new(-w, w, -h, h, -1.0, 1.0);
 
         // Write the projection to the GPU
         unsafe {
@@ -258,7 +257,7 @@ fn main() {
     let text = "Hello World!";
 
     let get_text_width = |text: &str| {
-        let mut width = 0;
+        let mut width = 0.0;
 
         // Compute the total width of the string so we can center it
         for (i, c) in text.chars().enumerate() {
@@ -268,9 +267,15 @@ fn main() {
                 None => continue,
             };
 
-            // Add the width of each character plus its horizontal bearing
-            width += ch.size.0;
-            width += ch.bearing.0;
+            // Add the width of each character (its advance)
+            width += ch.advance as f32 / 64.0;
+
+            // Add corrections for first and last character
+            if i == 0 {
+                width -= ch.bearing.0 as f32;
+            } else if i == text.len() - 1 {
+                width -= (ch.advance as f32 / 64.0) - (ch.bearing.0 + ch.size.0) as f32;
+            }
         }
 
         width
@@ -279,30 +284,36 @@ fn main() {
     // Renders a line of text to the screen at a specified position
     let render_text = |text: &str, ypos: f32| {
         // Render some text to the screen
-        let mut x = -(get_text_width(text) as f32 / 2.0);
+        let mut x = -get_text_width(text) / 2.0;
         let y = ypos;
 
         shader_program.set_used();
 
         gl_util::bind_array(vao);
 
-        for c in text.chars() {
+        for (i, c) in text.chars().enumerate() {
             let ch: &Character = match char_map.get(&(c as u8)) {
                 Some(character) => character,
                 None => continue,
             };
 
-
             // Character units are expressed in 26.6 pixel format (1/64th of a pixel)
-            /* 
+            /*
             For pixel perfect font rendering we need to apply the correct transformation to the view space.
             This involves determining the conversion of 'font pixels' to 'double unit cube' coordinates.
             Effectively this is a translation and scaling in the X and Y axes (aka an orthographic projection)
             This is different than the orthographic projection that would be normally used for transforming 'world coordinates'
-            to 'view space' coordinates. 
+            to 'view space' coordinates.
             */
 
-            let xpos = x + ch.bearing.0 as f32;
+            let xpos;
+
+            if i == 0 {
+                xpos = x;
+            } else {
+                xpos = x + ch.bearing.0 as f32;
+            }
+
             let ypos = y - (ch.size.1 - ch.bearing.1) as f32;
 
             let w = ch.size.0 as f32;
@@ -339,7 +350,7 @@ fn main() {
             gl_util::set_buffer_data(vbo, &vertices);
             gl_util::draw_triangles(6);
 
-            x += (ch.advance >> 6) as f32;
+            x += ch.advance as f32 / 64.0;
         }
     };
 
@@ -372,8 +383,6 @@ fn main() {
 
                         // Compute the projection
                         update_projection();
-
-                        // Compute new text size
                     },
                     _ => {}
                 },
