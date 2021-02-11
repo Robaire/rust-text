@@ -145,7 +145,7 @@ fn main() {
                 gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
                 gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
                 gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-                gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+                gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
             }
 
             // Add this character to our map
@@ -300,9 +300,6 @@ fn main() {
             Effectively this is a translation and scaling in the X and Y axes (aka an orthographic projection)
             This is different than the orthographic projection that would be normally used for transforming 'world coordinates'
             to 'view space' coordinates. 
-
-            Orthographic(left, right, bottom, top, near, far)
-            Orthographic(0, Window Width (pixels), 0, Window Height (pixels), -1.0, 1.0)
             */
 
             let xpos = x + ch.bearing.0 as f32;
@@ -310,8 +307,6 @@ fn main() {
 
             let w = ch.size.0 as f32;
             let h = ch.size.1 as f32;
-
-            println!("Character: {}, Size: ({}, {})", c, w, h);
 
             let vertices = vec![
                 xpos,
@@ -393,10 +388,10 @@ fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
-        render_text("Hello World!", 0.25);
+        render_text("Hello World!", 100.0);
         render_text(
             &format!("Cursor: {}, {}", cursor_pos.0, cursor_pos.1),
-            -0.25,
+            -100.0,
         );
         render_text(
             &format!("Window Size: {}, {}", window.size().0, window.size().1),
