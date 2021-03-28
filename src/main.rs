@@ -38,10 +38,10 @@ fn main() {
         };
 
         // Set the attributes of the OpenGL Context
-        let gl_attributes = video_subsystem.gl_attr();
-        gl_attributes.set_context_profile(GLProfile::Core);
-        gl_attributes.set_context_flags().debug().set();
-        gl_attributes.set_context_version(3, 3);
+        // let gl_attributes = video_subsystem.gl_attr();
+        // gl_attributes.set_context_profile(GLProfile::Core);
+        // gl_attributes.set_context_flags().debug().set();
+        // gl_attributes.set_context_version(3, 3);
 
         // Determine the size of the window to open
         let (width, height) = match video_subsystem.desktop_display_mode(0) {
